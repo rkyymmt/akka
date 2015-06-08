@@ -18,6 +18,8 @@ object Dependencies {
   )
 
   object Compile {
+    val akkaStream = "com.typesafe.akka" %% "akka-stream-experimental" % "1.0-RC3"
+
     // Compile
     val camelCore     = "org.apache.camel"            % "camel-core"                   % "2.13.4" exclude("org.slf4j", "slf4j-api") // ApacheV2
 
@@ -107,6 +109,8 @@ object Dependencies {
   val agent = l ++= Seq(scalaStm.value, Test.scalatest.value, Test.junit)
 
   val persistence = l ++= Seq(protobuf, Provided.levelDB, Provided.levelDBNative, Test.scalatest.value, Test.junit, Test.commonsIo, Test.scalaXml)
+
+  val persistenceQuery = l ++= Seq(akkaStream, Test.scalatest.value, Test.junit, Test.commonsIo)
 
   val persistenceTck = l ++= Seq(Test.scalatest.value.copy(configurations = Some("compile")), Test.junit.copy(configurations = Some("compile")))
 
