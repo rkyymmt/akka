@@ -71,7 +71,7 @@ case object AllPersistenceIds extends Query[String, Unit]
  *
  * A plugin may optionally support this [[Query]].
  */
-case class EventsByPersistenceId(persistenceId: String, fromSequenceNr: Long, toSequenceNr: Long)
+case class EventsByPersistenceId(persistenceId: String, fromSequenceNr: Long = 0L, toSequenceNr: Long = Long.MaxValue)
   extends Query[Any, Unit]
 
 /**
@@ -90,7 +90,7 @@ case class EventsByPersistenceId(persistenceId: String, fromSequenceNr: Long, to
  *
  * A plugin may optionally support this [[Query]].
  */
-case class EventsByTag(tag: String, timestamp: Long) extends Query[Any, Unit]
+case class EventsByTag(tag: String, timestamp: Long = 0L) extends Query[Any, Unit]
 
 /**
  * Query hint that defines how to execute the query,
