@@ -13,22 +13,23 @@ import akka.stream.actor.ActorPublisherMessage.Cancel
 import akka.stream.actor.ActorPublisherMessage.Request
 import com.typesafe.config._
 import akka.persistence.PersistentRepr
+import akka.persistence.query.EventEnvelope
 
 object EventsByTagPublisher {
-  def props(tag: String, timestamp: Long, refreshInterval: FiniteDuration): Props =
-    Props(new EventsByTagPublisher(tag, timestamp, refreshInterval))
+  def props(tag: String, offset: Long, refreshInterval: FiniteDuration): Props =
+    Props(new EventsByTagPublisher(tag, offset, refreshInterval))
 
   private case object Continue
 }
 
-class EventsByTagPublisher(tag: String, timestamp: Long, refreshInterval: FiniteDuration)
-  extends ActorPublisher[Any] {
+class EventsByTagPublisher(tag: String, offset: Long, refreshInterval: FiniteDuration)
+  extends ActorPublisher[EventEnvelope] {
   import EventsByTagPublisher._
 
   private val limit = 1000
 
   private var currentId = 0L
-  var buf = Vector.empty[Any]
+  var buf = Vector.empty[EventEnvelope]
 
   import context.dispatcher
   val continueTask = context.system.scheduler.schedule(
@@ -52,11 +53,16 @@ class EventsByTagPublisher(tag: String, timestamp: Long, refreshInterval: Finite
       try {
         // Could be an SQL query, for example:
         //      "SELECT id, persistent_repr FROM journal WHERE tag = like ? and " +
-        //        "created >= ? and id >= ? ORDER BY created, id limit ?"
+        //        "id >= ? ORDER BY id limit ?"
         val result: Vector[(Long, Array[Byte])] = ???
         currentId = if (result.nonEmpty) result.last._1 else currentId
         val serialization = SerializationExtension(context.system)
-        buf = result.map { case (_, p) ⇒ serialization.deserialize(p, classOf[PersistentRepr]).get }
+
+        buf = result.map {
+          case (id, bytes) ⇒
+            val p = serialization.deserialize(bytes, classOf[PersistentRepr]).get
+            EventEnvelope(offset = id, p.persistenceId, p.sequenceNr, p.payload)
+        }
       } catch {
         case e: Exception ⇒
           onErrorThenStop(e)

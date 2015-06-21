@@ -12,6 +12,7 @@ import akka.persistence.query.Query
 import akka.persistence.query.ReadJournal
 import akka.persistence.query.RefreshInterval
 import akka.stream.scaladsl.Source
+import akka.persistence.query.EventEnvelope
 
 class MyReadJournal(system: ExtendedActorSystem) extends ReadJournal {
 
@@ -20,8 +21,8 @@ class MyReadJournal(system: ExtendedActorSystem) extends ReadJournal {
 
   override def query[T, M](q: Query[T, M], hints: Hint*): Source[T, M] = {
     q match {
-      case EventsByTag(tag, timestamp) ⇒
-        Source.actorPublisher[String](EventsByTagPublisher.props(tag, timestamp,
+      case EventsByTag(tag, offset) ⇒
+        Source.actorPublisher[EventEnvelope](EventsByTagPublisher.props(tag, offset,
           refreshInterval(hints))).mapMaterializedValue(_ ⇒ ())
 
       case q ⇒

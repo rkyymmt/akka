@@ -24,7 +24,7 @@ import scala.concurrent.duration.FiniteDuration
  * {{{
  * final ReadJournal journal =
  *   PersistenceQuery.get(system).readJournalFor(queryPluginConfigPath);
- * final Source&lt;Object, ?&gt; events = journal.query(
+ * final Source&lt;EventEnvelope, ?&gt; events = journal.query(
  *   new EventsByTag("mytag", 0L));
  * }}}
  */
@@ -59,7 +59,7 @@ trait Query[T, M]
  *
  * A plugin may optionally support this [[Query]].
  */
-case object AllPersistenceIds extends Query[String, Unit]
+final case object AllPersistenceIds extends Query[String, Unit]
 
 /**
  * Query events for a specific `PersistentActor` identified by `persistenceId`.
@@ -71,26 +71,40 @@ case object AllPersistenceIds extends Query[String, Unit]
  *
  * A plugin may optionally support this [[Query]].
  */
-case class EventsByPersistenceId(persistenceId: String, fromSequenceNr: Long = 0L, toSequenceNr: Long = Long.MaxValue)
+final case class EventsByPersistenceId(persistenceId: String, fromSequenceNr: Long = 0L, toSequenceNr: Long = Long.MaxValue)
   extends Query[Any, Unit]
 
 /**
  * Query events that have a specific tag. A tag can for example correspond to an
- * aggregate root type (in DDD terminology). The query can be limited to to all events
- * created at or after the given `timestamp`, which is specified as number of milliseconds
- * since the standard base time known as "the epoch", namely January 1, 1970, 00:00:00 GMT.
+ * aggregate root type (in DDD terminology).
  *
- * The exact meaning of the timestamp may be slightly different for different journal
- * implementations and some journals may not even support a timestamp, and should
- * then fail the stream with `UnsupportedOperationException` if `timestamp` was
- * specified as anything else than `0L`.
+ * The consumer can keep track of its current position in the event stream by storing the
+ * `offset` and restart the query from a given `offset` after a crash/restart.
  *
- * The returned event stream should be ordered by timestamp, if the journal
- * supports timestamps.
+ * The exact meaning of the `offset` depends on the journal and must be documented by the
+ * read journal plugin. It may be a sequential id number that uniquely identifies the
+ * position of each event within the event stream. Distributed data stores cannot easily
+ * support those semantics and they may use a weaker meaning. For example it may be a
+ * timestamp (taken when the event was created or stored). Timestamps are not unique and
+ * not strictly ordered, since clocks on different machines may not be synchronized.
+ *
+ * The returned event stream should be ordered by `offset` if possible, but this can also be
+ * difficult to fulfill for a distributed data store. The order must be documented by the
+ * read journal plugin.
  *
  * A plugin may optionally support this [[Query]].
  */
-case class EventsByTag(tag: String, timestamp: Long = 0L) extends Query[Any, Unit]
+final case class EventsByTag(tag: String, offset: Long = 0L) extends Query[EventEnvelope, Unit]
+
+/**
+ * Event wrapper adding meta data for the events in the result stream of
+ * [[EventsByTag]] query, or similar queries.
+ */
+final case class EventEnvelope(
+  offset: Long,
+  persistenceId: String,
+  sequenceNr: Long,
+  event: Any)
 
 /**
  * Query hint that defines how to execute the query,
@@ -105,7 +119,7 @@ trait Hint
  *
  * A plugin may optionally support this [[Hint]] for defining such a refresh interval.
  */
-case class RefreshInterval(interval: FiniteDuration) extends Hint
+final case class RefreshInterval(interval: FiniteDuration) extends Hint
 
 /**
  * If the event stream is supposed to be completed immediately when it
@@ -113,5 +127,5 @@ case class RefreshInterval(interval: FiniteDuration) extends Hint
  *
  * A plugin may optionally support this [[Hint]].
  */
-case object NoRefresh extends Hint
+final case object NoRefresh extends Hint
 
