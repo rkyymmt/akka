@@ -6,17 +6,56 @@ package docs.persistence.query
 
 import akka.actor.ExtendedActorSystem
 import akka.persistence.query._
-import akka.stream.ActorFlowMaterializer
-import akka.stream.scaladsl.{ Sink, Source }
+import akka.stream.{FlowShape, ActorFlowMaterializer}
+import akka.stream.scaladsl.FlowGraph
+import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.testkit.AkkaSpec
 
 import scala.collection.immutable
+import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
 
-// TODO make sure a journal with NOT taking EAS can work
-class NoopReadJournal(sys: ExtendedActorSystem) extends ReadJournal {
-  override def query[T, M](q: Query[T, M], hints: Hint*): Source[T, M] =
-    Source.empty.mapMaterializedValue(_ => null.asInstanceOf[M])
+object PersistenceQueryDocSpec {
+
+  // TODO make sure a journal with NOT taking EAS can work
+  class NoopReadJournal(sys: ExtendedActorSystem) extends ReadJournal {
+    override def query[T, M](q: Query[T, M], hints: Hint*): Source[T, M] =
+      Source.empty.mapMaterializedValue(_ => null.asInstanceOf[M])
+  }
+
+  //#my-read-journal
+  class MyReadJournal(system: ExtendedActorSystem) extends ReadJournal {
+
+    // TODO from config
+    private val defaulRefreshInterval: FiniteDuration = 3.seconds
+
+    override def query[T, M](q: Query[T, M], hints: Hint*): Source[T, M] =
+      q match {
+        case EventsByTag(tag, offset) ⇒
+          val props = MyEventsByTagPublisher.props(tag, offset, refreshInterval(hints))
+          Source.actorPublisher[EventEnvelope](props)
+            .mapMaterializedValue(_ ⇒ noMaterializedValue)
+
+        case unsupported ⇒
+          Source.failed[T](
+            new UnsupportedOperationException(s"Query $unsupported not supported by ${getClass.getName}"))
+            .mapMaterializedValue(_ ⇒ noMaterializedValue)
+      }
+
+    private def refreshInterval(hints: Seq[Hint]): FiniteDuration =
+      hints.collectFirst { case RefreshInterval(interval) ⇒ interval }
+        .getOrElse(defaulRefreshInterval)
+
+    private def noMaterializedValue[M]: M =
+      null.asInstanceOf[M]
+  }
+
+  //#my-read-journal
+
+
 }
+
 
 class PersistenceQueryDocSpec(s: String) extends AkkaSpec(s) {
 
@@ -31,25 +70,60 @@ class PersistenceQueryDocSpec(s: String) extends AkkaSpec(s) {
 
   //#basic-usage
   // obtain read journal by plugin id
-  val readJournal = PersistenceQuery(system).readJournalFor("akka.persistence.query.noop-read-journal")
+  val readJournal =
+    PersistenceQuery(system).readJournalFor("akka.persistence.query.noop-read-journal")
 
   // issue query to journal
-  val source: Source[Any, Unit] = readJournal.query(EventsByPersistenceId("user-1337", 0, Long.MaxValue))
+  val source: Source[Any, Unit] =
+    readJournal.query(EventsByPersistenceId("user-1337", 0, Long.MaxValue))
 
   // materialize stream, consuming events
   implicit val mat = ActorFlowMaterializer()
   source.runForeach { event => println("Event: " + event) }
   //#basic-usage
 
+  //#all-persistence-ids-live
+  readJournal.query(AllPersistenceIds)
+  //#all-persistence-ids-live
+
+  //#all-persistence-ids-snap
+  readJournal.query(AllPersistenceIds, hints = NoRefresh)
+  //#all-persistence-ids-snap
+
+  //#events-by-tag
+  // assuming journal is able to work with numeric offsets we can:
+
+  val blueThings: Source[EventEnvelope, Unit] =
+    readJournal.query(EventsByTag("blue"))
+
+  // find top 10 blue things:
+  val top10BlueThings: Future[Vector[Any]] =
+    blueThings
+      .map(_.event)
+      .take(10) // cancels the query stream after pulling 10 elements
+      .runFold(Vector.empty[Any])(_ :+ _)
+
+  // start another query, from the known offset
+  val furtherBlueThings = readJournal.query(EventsByTag("blue", offset = 10))
+  //#events-by-tag
+
+  //#events-by-persistent-id-refresh
+  readJournal.query(EventsByPersistenceId("user-us-1337"), hints = RefreshInterval(1.second))
+
+  //#events-by-persistent-id-refresh
+
   //#advanced-journal-query-definition
   final case class RichEvent(tags: immutable.Set[String], payload: Any)
+
   case class QueryStats(totalEvents: Long)
 
   case class ByTagsWithStats(tags: immutable.Set[String])
     extends Query[RichEvent, QueryStats]
+
   //#advanced-journal-query-definition
 
   //#advanced-journal-query-hints
+
   import scala.concurrent.duration._
 
   readJournal.query(EventsByTag("blue"), hints = RefreshInterval(1.second))
@@ -63,5 +137,22 @@ class PersistenceQueryDocSpec(s: String) extends AkkaSpec(s) {
     .mapMaterializedValue { stats => println(s"Stats: $stats") }
     .map { event => println(s"Event payload: ${event.payload}") }
     .runWith(Sink.ignore)
+
   //#advanced-journal-query-usage
+
+  //#materialized-query-metadata
+  // a plugin can provide:
+  case class QueryMetadata(deterministicOrder: Boolean, infinite: Boolean)
+
+  case object AllEvents extends Query[Any, QueryMetadata]
+
+  val events = readJournal.query(AllEvents)
+  events
+    .mapMaterializedValue { meta =>
+    println(s"The query is: " +
+      s"ordered deterministically: ${meta.deterministicOrder}, " +
+      s"infinite: ${meta.infinite}")
+  }
+  //#materialized-query-metadata
+
 }

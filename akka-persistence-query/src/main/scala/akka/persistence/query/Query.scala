@@ -100,11 +100,13 @@ final case class EventsByTag(tag: String, offset: Long = 0L) extends Query[Event
  * Event wrapper adding meta data for the events in the result stream of
  * [[EventsByTag]] query, or similar queries.
  */
+//#event-envelope
 final case class EventEnvelope(
   offset: Long,
   persistenceId: String,
   sequenceNr: Long,
   event: Any)
+//#event-envelope
 
 /**
  * Query hint that defines how to execute the query,

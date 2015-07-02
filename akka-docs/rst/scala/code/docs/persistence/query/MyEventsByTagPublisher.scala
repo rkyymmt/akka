@@ -1,30 +1,30 @@
-/**
+/*
  * Copyright (C) 2015 Typesafe Inc. <http://www.typesafe.com>
  */
+
 package docs.persistence.query
 
-import scala.annotation.tailrec
-import scala.concurrent.duration._
 import akka.actor.Props
 import akka.persistence.PersistentRepr
+import akka.persistence.query.EventEnvelope
 import akka.serialization.SerializationExtension
 import akka.stream.actor.ActorPublisher
-import akka.stream.actor.ActorPublisherMessage.Cancel
-import akka.stream.actor.ActorPublisherMessage.Request
-import com.typesafe.config._
-import akka.persistence.PersistentRepr
-import akka.persistence.query.EventEnvelope
+import akka.stream.actor.ActorPublisherMessage.{Cancel, Request}
 
-object EventsByTagPublisher {
+import scala.annotation.tailrec
+import scala.concurrent.duration.FiniteDuration
+
+object MyEventsByTagPublisher {
   def props(tag: String, offset: Long, refreshInterval: FiniteDuration): Props =
-    Props(new EventsByTagPublisher(tag, offset, refreshInterval))
+    Props(new MyEventsByTagPublisher(tag, offset, refreshInterval))
 
   private case object Continue
 }
 
-class EventsByTagPublisher(tag: String, offset: Long, refreshInterval: FiniteDuration)
+//#events-by-tag-publisher
+class MyEventsByTagPublisher(tag: String, offset: Long, refreshInterval: FiniteDuration)
   extends ActorPublisher[EventEnvelope] {
-  import EventsByTagPublisher._
+  import MyEventsByTagPublisher._
 
   private val limit = 1000
 
@@ -83,3 +83,4 @@ class EventsByTagPublisher(tag: String, offset: Long, refreshInterval: FiniteDur
       }
     }
 }
+//#events-by-tag-publisher
