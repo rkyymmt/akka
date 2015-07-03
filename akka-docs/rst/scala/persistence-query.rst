@@ -128,6 +128,27 @@ specialised query object, as demonstrated in the sample below:
 .. _Akka Streams: http://doc.akka.io/docs/akka-stream-and-http-experimental/1.0-RC3/scala.html
 .. _Community plugins: http://akka.io/community/
 
+Performance and denormalization
+===============================
+When building systems using :ref:`event-sourcing` and CQRS (`Command & Query Responsibility Segragation`_) techniques
+it is tremendously important to realise that the write-side has completely different needs from the read-side,
+and separating those concerns into datastores that are optimised for either side makes it possible to offer the best
+expirience for the write and read sides independently.
+
+For example in add bidding systems, it is important to "take the write" and respond to the bidder that we have accepted
+the bid as soon as possible, which means that write-throughput is of highest importance for the write-side – often this
+means that data stores which are able to scale to accomodate these requirements have a less expressive query side.
+
+On the other hand the same application may have some complex statistics view or we may have analists working with the data
+to figure out best bidding strategies and trends – this often requires some kind of expressive query capabilities like
+for example SQL or writing Spark jobs to analyse the data. To offer data more efficiently to those kinds of
+
+.. includecode:: code/docs/persistence/query/PersistenceQueryDocSpec.scala#projection-into-different-store
+
+.. includecode:: code/docs/persistence/query/PersistenceQueryDocSpec.scala#projection-into-different-store-run
+
+.. _Command & Query Responsibility Segragation: https://msdn.microsoft.com/en-us/library/jj554200.aspx
+
 Dependencies
 ============
 
@@ -141,13 +162,14 @@ Akka persistence query is a separate jar file. Make sure that you have the follo
 Query plugins
 =============
 
-Various journal plugin implementations are what makes this module so powerful and elastic in its use.
-Since different data stores provide different query capabilities
+Various read journal plugin implementations are what makes this module so powerful and elastic in its use.
+Since different data stores provide different query capabilities journal plugins **must extensively document**
+their exposed semantics as well as handled query scenarios.
 
 Read Journal plugin API
 -----------------------
 
-Journals *MUST* return a failed ``Source`` if they are unable to execute the passed in query.
+Journals *MUST* return a *failed* ``Source`` if they are unable to execute the passed in query.
 For example if the user accidentally passed in an ``SqlQuery()`` to a key-value journal.
 
 Below is a simple journal implementations:

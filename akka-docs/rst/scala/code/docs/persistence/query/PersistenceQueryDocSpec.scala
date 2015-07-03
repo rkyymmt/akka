@@ -4,12 +4,14 @@
 
 package docs.persistence.query
 
-import akka.actor.ExtendedActorSystem
+import akka.actor._
+import akka.persistence.{Recovery, PersistentActor}
 import akka.persistence.query._
 import akka.stream.{FlowShape, ActorFlowMaterializer}
 import akka.stream.scaladsl.FlowGraph
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.testkit.AkkaSpec
+import docs.persistence.query.PersistenceQueryDocSpec.TheOneWhoWritesToQueryJournal
 
 import scala.collection.immutable
 import scala.concurrent.Future
@@ -52,7 +54,30 @@ object PersistenceQueryDocSpec {
   }
 
   //#my-read-journal
+  case class ComplexState() {
+    def readyToSave = false
+  }
+  case class Record(any: Any)
+  class DummyStore { def save(record: Record) = Future.successful(42L)  }
+  //#projection-into-different-store
+  class TheOneWhoWritesToQueryJournal(id: String) extends Actor {
+    val store = new DummyStore()
+    
+    var state: ComplexState = ComplexState()
+    
+    def receive = {
+      case m => 
+        state = updateState(state, m)
+        if (state.readyToSave) store.save(Record(state))
+    }
 
+    def updateState(state: ComplexState, msg: Any): ComplexState = {
+      // some complicated aggregation logic here ... 
+      state
+    }
+  }
+
+  //#projection-into-different-store
 
 }
 
@@ -153,6 +178,31 @@ class PersistenceQueryDocSpec(s: String) extends AkkaSpec(s) {
       s"ordered deterministically: ${meta.deterministicOrder}, " +
       s"infinite: ${meta.infinite}")
   }
+
   //#materialized-query-metadata
+
+  //#projection-into-different-store
+  class MyResumableProjection(name: String) {
+    def saveProgress(offset: Long): Future[Long] = ???
+    def latestOffset: Future[Long] = ???
+  }
+  //#projection-into-different-store
+
+  //#projection-into-different-store-run
+  import akka.pattern.ask
+
+  val bidProjection = new MyResumableProjection("bid")
+
+  val writerProps = Props(classOf[TheOneWhoWritesToQueryJournal], "bid")
+  val writer = system.actorOf(writerProps, "bid-projection-writer")
+
+  bidProjection.latestOffset.foreach { startFromOffset =>
+    readJournal
+      .query(EventsByTag("bid", startFromOffset))
+      .mapAsync(8) { envelope => (writer ? envelope.event).map(_ => envelope.offset) }
+      .mapAsync(1) { offset => bidProjection.saveProgress(offset) }
+      .runWith(Sink.ignore)
+  }
+  //#projection-into-different-store-run
 
 }
