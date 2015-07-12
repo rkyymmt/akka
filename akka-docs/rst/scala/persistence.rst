@@ -630,6 +630,7 @@ Event Adapters help in situations where:
   understand JSON it is possible to write an EventAdapter ``toJournal:Any=>JSON`` such that the Journal can *directly* store the
   json instead of serializing the object to its binary representation.
 
+.. image:: ../images/persistence-eventadapter.png
 
 Implementing an EventAdapter is rather stright forward:
 
