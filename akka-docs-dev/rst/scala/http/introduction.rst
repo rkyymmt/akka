@@ -1,32 +1,31 @@
-Introduction
+導入
 ============
 
-The Akka HTTP modules implement a full server- and client-side HTTP stack on top of *akka-actor* and *akka-stream*. It's
-not a web-framework but rather a more general toolkit for providing and consuming HTTP-based services. While interaction
-with a browser is of course also in scope it is not the primary focus of Akka HTTP.
+Akka HTTP モジュールは、akka-actor と akka-stream 上に実装されている、HTTP サーバのフルスタックと HTTP クライアントスタックです。
+これは、Web フレームワークではなく、より一般的な HTTP ベースのサービスを提供・利用するためのツールキットです。ブラウザとの相互作用も、
+Akka HTTP のスコープ内ですが、主な焦点ではありません。
 
-Akka HTTP follows a rather open design and many times offers several different API levels for "doing the same thing".
-You get to pick the API level of abstraction that is most suitable for your application.
-This means that, if you have trouble achieving something using a high-level API, there's a good chance that you can get
-it done with a low-level API, which offers more flexibility but might require you to write more application code.
+Akka HTTP は、とてもオープンな設計になっており、「同じことを行う」ためのいくつかの異なるAPIレベルを提供しており、開発者は、実装時に
+自分のアプリケーションに最適な抽象化レベルのAPIを選ぶことができます。
+これは、高レベルAPIの利用時に何かトラブルを抱えた場合でも、低レベルAPIによってそれを乗り越えられる可能性があることを意味します。
+これは、より多くの柔軟性を提供していますが、同時に、多くのアプリケーションコードを記述する必要が出てきます。
 
-Akka HTTP is structured into several modules:
+Akka HTTP は複数のモジュールで構成されています:
 
 akka-http-core
-  A complete, mostly low-level, server- and client-side implementation of HTTP (incl. WebSockets)
+  完全な、ほとんどが低レベル、 HTTP のサーバ/クライアント側の実装（ WebSocket を含む）
 
 akka-http
-  Higher-level functionality, like (un)marshalling, (de)compression as well as a powerful DSL
-  for defining HTTP-based APIs on the server-side
+  （アン）マーシャリング、圧縮・展開、および、サーバ側の HTTP ベースな API のための強力な DSL などの高レベル機能
 
 akka-http-testkit
-  A test harness and set of utilities for verifying server-side service implementations
+  テストハーネスとサーバ側サービス実装の検証のためのユーティリティ群
 
 akka-http-spray-json
-  Predefined glue-code for (de)serializing custom types from/to JSON with spray-json_
+  spray-json_ による、事前定義された、カスタム型⇔JSON間（デ）シリアライズのためのグルーコード
 
 akka-http-xml
-  Predefined glue-code for (de)serializing custom types from/to XML with scala-xml_
+  scala-xml_ による、事前定義された、カスタム型⇔XML間（デ）シリアライズのためのグルーコード
 
 .. _spray-json: https://github.com/spray/spray-json
 .. _scala-xml: https://github.com/scala/scala-xml
